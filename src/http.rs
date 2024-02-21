@@ -22,6 +22,7 @@ use ruma::api::{
     appservice::thirdparty::get_protocol::v1::Request as RumaGetProtocolRequest,
     appservice::thirdparty::get_user_for_user_id::v1::Request as RumaGetThirdpartyUserForUIDRequest,
     appservice::ping::send_ping::v1::Request as RumaPingRequest,
+    appservice::thirdparty::get_location_for_room_alias::v1::Request as RumaGetLocationForRoomRequest
 };
 use tower_http::validate_request::{ValidateRequest, ValidateRequestHeaderLayer};
 
@@ -156,8 +157,26 @@ async fn get_location_protocol() {
     todo!("get loc protocol")
 }
 
-async fn get_location() {
-    todo!("get location")
+async fn handle_get_location(request: RumaGetLocationForRoomRequest) {
+    todo!("handling get location")
+}
+
+async fn get_location(request: RequestExtractor) -> Response {
+    let req: RumaGetLocationForRoomRequest = RumaGetLocationForRoomRequest::try_from_http_request::<_, &'static str>(
+        into_bytes_request(request).await,
+        &[]
+    ).unwrap();
+
+    if MATRIX_HANDLERS_RELEASED {
+        // do whatever it takes.
+        handle_get_location(req).await;
+    };
+
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .body(Body::new(json!({}).to_string())).unwrap();
+
+    response
 }
 
 async fn handle_post_ping(request: RumaPingRequest) {
@@ -492,7 +511,7 @@ mod tests {
         let hs_token = "test_handle_unknown_endpoint";
         let request = Request::builder()
             .method("GET")
-            .uri("/_matrix/app/v1/thirdparty/location")
+            .uri("/_matrix/app/v1/thirdparty/location?alias=exercitation%20minim")
             .header(header::AUTHORIZATION, format!("Bearer {hs_token}"))
             .body(Body::empty())
             .unwrap();
