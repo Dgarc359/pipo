@@ -26,6 +26,8 @@ services:
       - "${IRCD_LISTEN_ADDR:-127.0.0.1}:${IRCD_TLS_PORT:-6697}:6697"
 
   app:
+    environment:
+      - RUST_LOG=info
     depends_on:
       - ircd
     build:

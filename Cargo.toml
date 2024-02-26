@@ -44,6 +44,8 @@ tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
 tower-http = { version = "0.5", features = ["auth", "map-response-body", "validate-request"] }
 tower-layer = "0.3"
 webpki-roots = "0.26"
+env_logger = "0.11.2"
+log = "0.4.20"
 
 [dev-dependencies]
 tower-service = "0.3.2"

@@ -22,7 +22,9 @@ mod mumble;
 pub(crate) mod protos;
 mod rachni;
 pub mod slack;
+mod pipolog;
 
+use crate::pipolog::Logger;
 use crate::discord::Discord;
 use crate::irc::IRC;
 use crate::matrix::Matrix;
@@ -270,6 +272,7 @@ struct ParsedConfig {
 }
 
 pub async fn inner_main() -> anyhow::Result<()> {
+    Logger::init();
     let args: Vec<String> = env::args().collect();
     let config_path = args.get(1).cloned().or(env::var("CONFIG_PATH").ok());
     let db_path = args.get(2).cloned().or(env::var("DB_PATH").ok());
