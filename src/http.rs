@@ -1,14 +1,18 @@
 use core::fmt;
 use std::marker::PhantomData;
 
+<<<<<<< HEAD
 use serde_json::json;
 use serde::{Serialize, Deserialize};
+=======
+>>>>>>> feature/matrix
 use axum::{
     body::Body,
     http::{header, HeaderValue, Request, StatusCode, Uri},
     response::Response,
     routing::{get, put, post},
     Router,
+<<<<<<< HEAD
     extract::{Path, Request as RequestExtractor, Query},
 };
 use bytes::{BytesMut, Bytes};
@@ -32,6 +36,17 @@ use ruma::api::{
 use tower_http::validate_request::{ValidateRequest, ValidateRequestHeaderLayer};
 
 const MATRIX_HANDLERS_RELEASED: bool = false;
+=======
+    extract::Path,
+};
+use bytes::BytesMut;
+use ruma::api::{
+    client::error::{ErrorBody, ErrorKind},
+    OutgoingResponse,
+};
+use tower_http::validate_request::{ValidateRequest, ValidateRequestHeaderLayer};
+
+>>>>>>> feature/matrix
 enum MatrixErrorCode {
     MForbidden,
 }
@@ -105,6 +120,7 @@ impl Http {
         self.app = self
             .app
             .clone()
+<<<<<<< HEAD
             .route("/_matrix/", get(|| async {}).fallback(unsupported_method))// TODO: request method
             .route("/_matrix/app/v1/users/:userId", get(get_user).fallback(unsupported_method))
             .route("/_matrix/app/v1/transactions/:txnId", put(put_transaction).fallback(unsupported_method))
@@ -115,6 +131,19 @@ impl Http {
             .route("/_matrix/app/v1/thirdparty/location/:protocol", get(get_location_protocol).fallback(unsupported_method))
             .route("/_matrix/app/v1/thirdparty/user", get(get_thirdparty_user).fallback(unsupported_method))
             .route("/_matrix/app/v1/thirdparty/user/:protocol", get(get_thirdparty_user_protocol).fallback(unsupported_method))
+=======
+            .route("/_matrix/", get(|| async {})) .fallback(unsupported_method)// TODO: request method
+            .route("/_matrix/app/v1/users/:userId", put(get_user)).fallback(unsupported_method)
+            .route("/_matrix/app/v1/transactions/:txnId", put(get_transaction)).fallback(unsupported_method)
+            .route("/_matrix/app/v1/rooms/:roomAlias", get(get_room)).fallback(unsupported_method)
+            .route("/_matrix/app/v1/thirdparty/protocol/:protocol", get(get_thirdparty_protocol)).fallback(unsupported_method)
+            .route("/_matrix/app/v1/ping", post(handle_ping)).fallback(unsupported_method)
+            .route("/_matrix/app/v1/thirdparty/location", get(get_location)).fallback(unsupported_method)
+            .route("/_matrix/app/v1/thirdparty/location/:protocol", get(get_location_protocol)).fallback(unsupported_method)
+            .route("/_matrix/app/v1/thirdparty/user", get(get_thirdparty_user)).fallback(unsupported_method)
+            .route("/_matrix/app/v1/thirdparty/user/:protocol", get(get_thirdparty_user)).fallback(unsupported_method)
+            .fallback(unsupported_method)
+>>>>>>> feature/matrix
             .fallback(unknown_route)
             .route_layer(ValidateRequestHeaderLayer::custom(MatrixBearer::new(
                 hs_token,
@@ -126,6 +155,7 @@ impl Http {
 }
 
 
+<<<<<<< HEAD
 async fn handle_get_thirdparty_user_protocol(request: RumaGetUserForProtocolRequest) {
     todo!("handle get thirdparty user protocol");
 }
@@ -344,6 +374,43 @@ async fn get_user(Path(user_id): Path<String>, request: RequestExtractor) -> Res
         .body(Body::new(json!({}).to_string())).unwrap();
 
     response
+=======
+async fn get_thirdparty_user_protocol() {
+    todo!("get tp user protocol")
+}
+
+async fn get_thirdparty_user() {
+    todo!("get tp user")
+}
+
+async fn get_location_protocol() {
+    todo!("get loc protocol")
+}
+
+async fn get_location() {
+    todo!("get location")
+}
+
+async fn handle_ping() {
+    todo!("ping")
+}
+
+async fn get_thirdparty_protocol(Path(protocol): Path<String>) -> String {
+    todo!("protocol")
+}
+
+
+async fn get_room(Path(room): Path<String>) -> String {
+    todo!("room")
+}
+
+async fn get_transaction(Path(tid): Path<String>) -> String {
+    todo!("txn")
+}
+
+async fn get_user(Path(user_id): Path<String>) -> String {
+    todo!("get user")
+>>>>>>> feature/matrix
 }
 
 
@@ -371,11 +438,17 @@ async fn unsupported_method(uri: Uri) -> Response {
     .into()
 }
 
+<<<<<<< HEAD
 
 #[cfg(test)]
 mod tests {
     use axum::{body::HttpBody, response::Json, extract::FromRequest};
     use ruma::{api::MatrixVersion, room_id, room_alias_id};
+=======
+#[cfg(test)]
+mod tests {
+    use axum::{body::HttpBody, response::Json};
+>>>>>>> feature/matrix
     use serde_json::{json, Value};
     use tower_service::Service;
 
@@ -486,6 +559,7 @@ mod tests {
         test_response(hs_token, request, expected).await;
     }
 
+<<<<<<< HEAD
     #[tokio::test]
     async fn matrix_handle_get_user() {
         let hs_token = "test_handle_get_users";
@@ -630,4 +704,6 @@ mod tests {
             .unwrap();
         test_response(hs_token, request, expected).await;
     }
+=======
+>>>>>>> feature/matrix
 }

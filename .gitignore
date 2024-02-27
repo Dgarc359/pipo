@@ -3,6 +3,10 @@
 \#*\#
 .\#*
 *.sqlite3
-*.json
 .DS_Store
+<<<<<<< HEAD
+=======
+.dev.env
+.env
+>>>>>>> feature/matrix
 .vagrant/
