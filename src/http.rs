@@ -23,10 +23,16 @@ use ruma::api::{
     appservice::thirdparty::get_protocol::v1::Request as RumaGetProtocolRequest,
     appservice::thirdparty::get_user_for_user_id::v1::Request as RumaGetThirdpartyUserForUIDRequest,
     appservice::ping::send_ping::v1::Request as RumaPingRequest,
-    appservice::query::query_user_id::v1::Request as RumaQueryUserIdRequest,
+    appservice::query::query_user_id::v1::{
+        Request as RumaQueryUserIdRequest,
+        Response as RumaQueryUserIdResponse
+    },
     appservice::thirdparty::get_location_for_protocol::v1::Request as RumaGetThirdpartyLocationForProtocol,
     appservice::thirdparty::get_user_for_protocol::v1::Request as RumaGetUserForProtocolRequest,
-    appservice::query::query_room_alias::v1::Request as RumaQueryRoomAliasRequest,
+    appservice::query::query_room_alias::v1::{
+        Request as RumaQueryRoomAliasRequest,
+        Response as RumaQueryRoomAliasResponse
+    },
     appservice::thirdparty::get_location_for_room_alias::v1::{
         Request as RumaGetLocationForRoomAliasRequest,
         Response as RumaGetLocationForRoomAliasResponse,
@@ -291,7 +297,7 @@ async fn get_thirdparty_protocol(Path(protocol): Path<String>, request: RequestE
     response
 }
 
-async fn handle_get_room(request: RumaQueryRoomAliasRequest) {
+async fn handle_get_room(request: RumaQueryRoomAliasRequest) -> RumaQueryRoomAliasResponse {
     todo!("handle getting room")
 }
 
@@ -303,7 +309,19 @@ async fn get_room(Path(room): Path<String>, request: RequestExtractor) -> Respon
 
     if MATRIX_HANDLERS_RELEASED {
         // do whatever it takes.
-        handle_get_room(req).await;
+        let res = handle_get_room(req).await;
+        let http_res = res.try_into_http_response().unwrap();
+
+        let (parts, body): (_, Vec<u8>) = http_res.into_parts();
+        let body_v= Body::new(json!(&body).to_string());
+
+        let response = Response::from_parts(
+            parts,
+            body_v
+        );
+
+        return response
+
     };
 
     let response = Response::builder()
@@ -351,7 +369,7 @@ async fn put_transaction(Path(tid): Path<String>, request: RequestExtractor) -> 
     response
 }
 
-async fn handle_get_user(request: RumaQueryUserIdRequest) {
+async fn handle_get_user(request: RumaQueryUserIdRequest) -> RumaQueryUserIdResponse {
     todo!("handle getting user")
 }
 
@@ -363,7 +381,19 @@ async fn get_user(Path(user_id): Path<String>, request: RequestExtractor) -> Res
 
     if MATRIX_HANDLERS_RELEASED {
         // do whatever it takes.
-        handle_get_user(req).await;
+        let res = handle_get_user(req).await;
+        let http_res = res.try_into_http_response().unwrap();
+
+        let (parts, body): (_, Vec<u8>) = http_res.into_parts();
+        let body_v= Body::new(json!(&body).to_string());
+
+        let response = Response::from_parts(
+            parts,
+            body_v
+        );
+
+        return response
+
     };
 
     let response = Response::builder()
