@@ -27,7 +27,10 @@ use ruma::api::{
     appservice::thirdparty::get_location_for_protocol::v1::Request as RumaGetThirdpartyLocationForProtocol,
     appservice::thirdparty::get_user_for_protocol::v1::Request as RumaGetUserForProtocolRequest,
     appservice::query::query_room_alias::v1::Request as RumaQueryRoomAliasRequest,
-    appservice::thirdparty::get_location_for_room_alias::v1::Request as RumaGetLocationForRoomAliasRequest,
+    appservice::thirdparty::get_location_for_room_alias::v1::{
+        Request as RumaGetLocationForRoomAliasRequest,
+        Response as RumaGetLocationForRoomAliasResponse,
+    },
 };
 use tower_http::validate_request::{ValidateRequest, ValidateRequestHeaderLayer};
 
@@ -196,8 +199,18 @@ async fn get_location_protocol(Path(protocol): Path<String>, request: RequestExt
 
     response
 }
+trait IntoAxumResponse {
+    fn into_axum_res(&self) -> Response;
+}
 
-async fn handle_get_thirdparty_location(request: RumaGetLocationForRoomAliasRequest) {
+impl IntoAxumResponse for RumaGetLocationForRoomAliasResponse {
+    fn into_axum_res(&self) -> Response {
+        todo!("into axum response");
+    }
+}
+
+
+async fn handle_get_thirdparty_location(request: RumaGetLocationForRoomAliasRequest) -> RumaGetLocationForRoomAliasResponse {
     todo!("handle get thirdparty location")
 }
 
@@ -209,7 +222,21 @@ async fn get_thirdparty_location(request: RequestExtractor) -> Response {
 
     if MATRIX_HANDLERS_RELEASED {
         // do whatever it takes.
-        handle_get_thirdparty_location(req).await;
+        let res =handle_get_thirdparty_location(req)
+            .await;
+
+        let http_res = res.try_into_http_response().unwrap();
+
+        let (parts, body): (_, Vec<u8>) = http_res.into_parts();
+        let body_v= Body::new(json!(&body).to_string());
+
+        let response = Response::from_parts(
+            parts,
+            body_v
+        );
+
+        return response
+
     };
 
     let response = Response::builder()

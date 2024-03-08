@@ -1,0 +1,34 @@
+{
+    "url":"http:\/\/app",
+    "buses":
+    [
+        {"id":"general"},
+        {"id":"mumble"},
+        {"id":"test"}
+    ],
+    "transports":
+    [
+        {
+            "transport":"IRC",
+            "nickname":"pipo",
+            "server":"ircd",
+            "use_tls":true,
+            "img_root":"http:\/\/example.com\/pipo",
+            "channel_mapping":
+            {
+                "#general":"general",
+                "#mumble":"mumble",
+                "#test":"test"
+            }
+        },
+        {
+            "transport":"Matrix",
+            "registration_path":"/etc/matrix-synapse/appservices/appservice-registration-pipo.yaml",
+            "channel_mapping":
+            {
+                "!room-id-1:example.com":"general",
+                "!room-id-2:example.com":"test"
+            }
+        }
+    ]
+}
