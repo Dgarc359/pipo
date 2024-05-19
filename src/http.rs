@@ -34,7 +34,7 @@ use ruma::api::{
 };
 use tower_http::validate_request::{ValidateRequest, ValidateRequestHeaderLayer};
 
-const MATRIX_HANDLERS_RELEASED: bool = false;
+const MATRIX_HANDLERS_RELEASED: bool = true;
 enum MatrixErrorCode {
     MForbidden,
 }
@@ -96,18 +96,19 @@ impl<B> ValidateRequest<B> for MatrixBearer {
     }
 }
 
-struct Http {
-    app: Router,
+pub struct Http {
+    pub app: Router,
 }
 
 impl Http {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self { app: Router::new() }
     }
     pub fn add_matrix_route(&mut self, hs_token: &str) {
         self.app = self
             .app
             .clone()
+            .route("/", get(handle_root_get).fallback(unsupported_method))
             .route("/_matrix/", get(|| async {}).fallback(unsupported_method))// TODO: request method
             .route("/_matrix/app/v1/users/:userId", get(get_user).fallback(unsupported_method))
             .route("/_matrix/app/v1/transactions/:txnId", put(put_transaction).fallback(unsupported_method))
@@ -128,12 +129,23 @@ impl Http {
     // }
 }
 
+async fn handle_root_get() -> Response {
+    dbg!("root path called");
+     let response = Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::new(json!({
+                "hello": "world"
+            }).to_string())).unwrap();
+
+     return response;
+}
 
 async fn handle_get_thirdparty_user_protocol(request: RumaGetUserForProtocolRequest) {
     todo!("handle get thirdparty user protocol");
 }
 
 async fn get_thirdparty_user_protocol(Path(protocol): Path<String>, request: RequestExtractor) -> Response {
+    dbg!("gtp");
     let req: RumaGetUserForProtocolRequest = RumaGetUserForProtocolRequest::try_from_http_request(
         into_bytes_request(request).await,
         &vec![protocol]
@@ -161,6 +173,7 @@ struct GetThirdpartyUser {
 }
 
 async fn get_thirdparty_user(userid: Query<GetThirdpartyUser>, request: RequestExtractor) -> Response {
+    dbg!("gtpu");
     let req: RumaGetThirdpartyUserForUIDRequest = RumaGetThirdpartyUserForUIDRequest::try_from_http_request(
         into_bytes_request(request).await,
         &vec![userid.userid.to_owned()]
@@ -183,6 +196,7 @@ async fn handle_get_location_protocol(request: RumaGetThirdpartyLocationForProto
 }
 
 async fn get_location_protocol(Path(protocol): Path<String>, request: RequestExtractor) -> Response {
+    dbg!("gtlp");
     let req = RumaGetThirdpartyLocationForProtocol::try_from_http_request(
         into_bytes_request(request).await,
         &vec![protocol]
@@ -215,6 +229,7 @@ async fn handle_get_thirdparty_location(request: RumaGetLocationForRoomAliasRequ
 }
 
 async fn get_thirdparty_location(request: RequestExtractor) -> Response {
+    dbg!("gtpl");
     let req = RumaGetLocationForRoomAliasRequest::try_from_http_request::<_, &'static str>(
         into_bytes_request(request).await,
         &[]
@@ -251,6 +266,7 @@ async fn handle_post_ping(request: RumaPingRequest) {
 }
 
 async fn post_ping(request: RequestExtractor) -> Response {
+    dbg!("postping");
     let req: RumaPingRequest = RumaPingRequest::try_from_http_request::<_, &'static str>(
         into_bytes_request(request).await,
         &[]
@@ -274,6 +290,7 @@ async fn handle_get_thirdparty_protocol(request:RumaGetProtocolRequest) {
 }
 
 async fn get_thirdparty_protocol(Path(protocol): Path<String>, request: RequestExtractor) -> Response {
+    dbg!("gtptcl");
     let req: RumaGetProtocolRequest = RumaGetProtocolRequest::try_from_http_request(
         into_bytes_request(request).await,
         &vec![protocol]
@@ -296,6 +313,7 @@ async fn handle_get_room(request: RumaQueryRoomAliasRequest) {
 }
 
 async fn get_room(Path(room): Path<String>, request: RequestExtractor) -> Response {
+    dbg!("gtroom");
     let req: RumaQueryRoomAliasRequest = RumaQueryRoomAliasRequest::try_from_http_request(
         into_bytes_request(request).await,
         &vec![room]
@@ -331,13 +349,78 @@ async fn into_bytes_request(request: Request<Body>) -> axum::http::Request<Bytes
 }
 
 async fn handle_put_transaction(request: RumaPushEventRequest) {
-    todo!("still todo")
+
+    #[derive(Debug, Deserialize)]
+    struct MaybeStateEvent {
+        state_key: Option<String>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct UndecidedNonStateEvent {
+        pub content: serde_json::Value,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct RoomInviteEvent {
+        age: i64,
+        content: ruma::events::room::member::RoomMemberEventContent,
+    }
+    for event in request.events.iter() {
+        dbg!("event! {:#?}", event);
+
+        let maybe_state_event: MaybeStateEvent = serde_json::from_str(event.clone().into_json().get()).unwrap();
+
+        // matrix api spec on handling transactions recommends checking for state_key
+        // to determine if txn is state type or otherwise...
+        // https://spec.matrix.org/v1.10/application-service-api/#put_matrixappv1transactionstxnid
+        if maybe_state_event.state_key.is_some() {
+            dbg!("I got a state event in transactions.. handle this");
+            continue;
+        }
+
+        let undecided_event = serde_json::from_str::<UndecidedNonStateEvent>(event.clone().into_json().get()).unwrap();
+
+        let maybe_text_event  = serde_json::from_value::<ruma::events::room::message::TextMessageEventContent>(undecided_event.content);
+
+        match maybe_text_event {
+            Ok(text) => {
+                dbg!("got event text {:?}", text.body);
+            },
+            Err(e) => {
+                dbg!("some error getting text event {:#?}", e);
+            }
+        }
+
+
+
+
+        /*
+        let deserded: RoomInviteEvent = serde_json::from_str(event.clone().into_json().get()).unwrap();
+        dbg!("did we deserde? {:#?}", &deserded);
+        */
+
+        /*
+
+        match deserded.content.membership {
+            ruma::events::room::member::MembershipState::Invite => {
+                dbg!("got an invite!!");
+            },
+            _ => { dbg!("we havent implemented this"); }
+        }
+        */
+
+    }
 }
 async fn put_transaction(Path(tid): Path<String>, request: RequestExtractor) -> Response {
+
+    dbg!("puttxn");
+    dbg!("payload: {:#?}", &request);
     let req: RumaPushEventRequest = RumaPushEventRequest::try_from_http_request(
         into_bytes_request(request).await,
         &vec![tid]
     ).unwrap();
+
+    dbg!("serdededredeed {:#?}", &req);
 
     if MATRIX_HANDLERS_RELEASED {
         // do whatever it takes.
@@ -356,6 +439,7 @@ async fn handle_get_user(request: RumaQueryUserIdRequest) {
 }
 
 async fn get_user(Path(user_id): Path<String>, request: RequestExtractor) -> Response {
+    dbg!("gtusr");
     let req: RumaQueryUserIdRequest = RumaQueryUserIdRequest::try_from_http_request(
         into_bytes_request(request).await,
         &vec![user_id]

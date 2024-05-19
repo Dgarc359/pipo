@@ -224,6 +224,7 @@ enum ConfigTransport {
     Matrix {
         registration_path: String,
         channel_mapping: HashMap<String, String>,
+        listen_port: String,
     },
     Minecraft {
         username: Arc<String>,
@@ -297,9 +298,9 @@ pub async fn inner_main() -> anyhow::Result<()> {
             .await?
             .interact(move |conn| -> anyhow::Result<i64> {
                 match conn.query_row(
-                    "SELECT name 
-                                  FROM sqlite_master 
-                                  WHERE type='table' 
+                    "SELECT name
+                                  FROM sqlite_master
+                                  WHERE type='table'
                                   AND name='messages'",
                     [],
                     |row| row.get::<usize, String>(0),
@@ -311,18 +312,18 @@ pub async fn inner_main() -> anyhow::Result<()> {
                                            id        INTEGER PRIMARY KEY,
                                            slackid   TEXT,
                                            discordid INTEGER,
-                                           modtime   DEFAULT 
+                                           modtime   DEFAULT
                                              (strftime('%Y-%m-%d %H:%M:%S:%s',
-                                                       'now', 
+                                                       'now',
                                                        'localtime'))
                                            );
                                         CREATE TRIGGER updatemodtime
                                         BEFORE update ON messages
                                         begin
-                                        update messages set modtime 
+                                        update messages set modtime
                                           = strftime('%Y-%m-%d %H:%M:%S:%s',
-                                                     'now', 
-                                                     'localtime') 
+                                                     'now',
+                                                     'localtime')
                                             where id = old.id;
                                         end;",
                         )?;
@@ -332,7 +333,7 @@ pub async fn inner_main() -> anyhow::Result<()> {
 
                 Ok(
                     match conn.query_row(
-                        "SELECT id FROM messages 
+                        "SELECT id FROM messages
                                      ORDER BY modtime DESC",
                         [],
                         |row| row.get(0),
@@ -491,6 +492,7 @@ pub async fn inner_main() -> anyhow::Result<()> {
             ConfigTransport::Matrix {
                 registration_path,
                 channel_mapping,
+                listen_port
             } => {
                 let mut instance = Matrix::new(
                     transport_id,
@@ -501,6 +503,7 @@ pub async fn inner_main() -> anyhow::Result<()> {
                     registration_path,
                     &config_json.transports,
                     &channel_mapping,
+                    listen_port.to_string(),
                 )
                 .await?;
                 let handle = tokio::spawn(async move {

@@ -6,12 +6,15 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use axum::{Router, routing::get};
+
 use anyhow::anyhow;
 use deadpool_sqlite::Pool;
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 use ruma::api::appservice::{Namespace, Namespaces, Registration, RegistrationInit};
 use tokio::sync::broadcast;
 
+use crate::http::Http;
 use crate::{ConfigTransport, Message};
 
 pub(crate) struct Matrix {
@@ -20,6 +23,7 @@ pub(crate) struct Matrix {
     channels: HashMap<String, broadcast::Sender<Message>>,
     pipo_id: Arc<Mutex<i64>>,
     pool: Pool,
+    listen_port: String,
 }
 
 impl Matrix {
@@ -32,6 +36,7 @@ impl Matrix {
         registration_path: P,
         protocols: &Vec<ConfigTransport>,
         channel_mapping: &HashMap<String, String>,
+        listen_port: String,
     ) -> anyhow::Result<Self>
     where
         P: AsRef<Path>,
@@ -49,20 +54,38 @@ impl Matrix {
             .collect();
         let protocols: Vec<_> = protocols.iter().map(|x| x.name().to_owned()).collect();
         let mut namespaces = Namespaces::new();
+        dbg!("channels {:#?}", &channels);
+        dbg!("protocols {:#?}", &protocols);
+        /*
         namespaces.users = protocols
             .iter()
             .map(|x| Namespace::new(true, format!("@_{}_.*:tejat\\.net", x.to_lowercase())))
             .collect();
+            */
+        namespaces.users = protocols
+            .iter()
+            .map(|x| Namespace::new(true, "@.*:synapse".to_string()))
+            .collect();
+
+        namespaces.aliases = protocols
+            .iter()
+            //.map(|x| Namespace::new(true, format!("#_{}_.#:tejat\\.net", x.to_lowercase())))
+            .map(|x| Namespace::new(false, "t.*".to_string()))
+            .collect();
+        /*
         namespaces.aliases = protocols
             .iter()
             .map(|x| Namespace::new(true, format!("#_{}_.#:tejat\\.net", x.to_lowercase())))
             .collect();
+            */
         namespaces.rooms = channels
             .keys()
             .map(|x| Namespace::new(true, x.to_owned()))
             .collect();
+
         let registration = match File::open(&registration_path) {
             Ok(registration_file) => {
+                println!("matrix -- found registration file, pulling fields");
                 let mut registration: Registration = serde_yaml::from_reader(registration_file)?;
                 if &registration.id == "pipo" {
                     registration.url = Some(url.to_string());
@@ -80,6 +103,7 @@ impl Matrix {
             },
             Err(e) => match e.kind() {
                 std::io::ErrorKind::NotFound => {
+                    println!("matrix -- did not find registration file, pulling fields");
                     let mut token_generator = TokenGenerator::new();
                     let as_token = token_generator.generate_token();
                     let hs_token = token_generator.generate_token();
@@ -102,16 +126,37 @@ impl Matrix {
             },
         }?;
 
+        // when file exists, we're not writing, so let's just overwrite the file now
+        // and then when I can figure out how to do this right, this can be
+        // removed
+
+        let fd = File::options().truncate(true).write(true).open(&registration_path).unwrap();
+        serde_yaml::to_writer(fd, &registration)?;
+
+        dbg!("late registration {:#?}", &registration);
+
         Ok(Self {
             transport_id,
             registration,
             channels,
             pipo_id,
             pool,
+            listen_port
         })
     }
+
+    async fn connect_matrix(&self) -> anyhow::Result<()> {
+        println!("matrix -- creating routers and listeners");
+        let mut http_router = Http::new();
+        http_router.add_matrix_route(&self.registration.hs_token);
+        let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", self.listen_port)).await.unwrap();
+        println!("matrix -- created routers and listeners, serving");
+        Ok(axum::serve(listener, http_router.app).await.unwrap())
+    }
+
     pub async fn connect(&self) -> anyhow::Result<()> {
-        Ok(())
+        println!("matrix -- connecting");
+        Ok(self.connect_matrix().await?)
     }
 }
 

@@ -1,5 +1,5 @@
 {
-    "url":"http:\/\/app",
+    "url":"http:\/\/app:3000",
     "buses":
     [
         {"id":"general"},
@@ -24,10 +24,11 @@
         {
             "transport":"Matrix",
             "registration_path":"/etc/matrix-synapse/appservices/appservice-registration-pipo.yaml",
+            "listen_port": "3000",
             "channel_mapping":
             {
                 "!room-id-1:example.com":"general",
-                "!room-id-2:example.com":"test"
+                "!.*:synapse":"general",
             }
         }
     ]
