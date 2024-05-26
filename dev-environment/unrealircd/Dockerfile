@@ -1,5 +1,6 @@
 FROM ircd/unrealircd:nightly
 USER root
+RUN apk add --no-cache net-tools
 RUN apk add --no-cache openssl \
     && openssl req \
     -x509 \

@@ -9,6 +9,11 @@ services:
     ports:
       - "${IRCD_LISTEN_ADDR:-127.0.0.1}:${IRCD_PORT:-6667}:6667"
       - "${IRCD_LISTEN_ADDR:-127.0.0.1}:${IRCD_TLS_PORT:-6697}:6697"
+    healthcheck:
+      test: ["CMD", "netstat", "-an", "|", "grep", "6697", "/dev/null;", "if", "[", "0", "!=", "$?", "];", "then", "exit", "1;", "fi;"]
+      interval: 1s
+      timeout: 60s
+      retries: 60
 
   postgres:
     image: postgres
@@ -46,8 +51,11 @@ services:
         target: /data
 
   app:
-    depends_on:
+    links:
       - ircd
+    depends_on:
+      ircd:
+        condition: service_healthy
     build:
       context: .
       target: debug
