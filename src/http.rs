@@ -1,15 +1,24 @@
 use core::fmt;
-use std::marker::PhantomData;
+use std::{
+    marker::PhantomData,
+    collections::HashMap,
+    sync::Arc,
+};
+use tokio::sync::broadcast::Sender;
 
+use crate::{
+    Attachment,
+    Message,
+};
 use serde_json::json;
 use serde::{Serialize, Deserialize};
 use axum::{
     body::Body,
     http::{header, HeaderValue, Request, StatusCode, Uri},
-    response::Response,
+    response::{Response, IntoResponse},
     routing::{get, put, post},
     Router,
-    extract::{Path, Request as RequestExtractor, Query},
+    extract::{Path, Request as RequestExtractor, Query, State, Extension},
 };
 use bytes::{BytesMut, Bytes};
 use ruma::api::{
@@ -96,22 +105,29 @@ impl<B> ValidateRequest<B> for MatrixBearer {
     }
 }
 
+struct AppState {
+    pub channels: HashMap<String, Sender<Message>>
+}
+
 pub struct Http {
     pub app: Router,
+    // TODO: this can be a shared reference in a few different places.
+    pub channels: HashMap<String, Sender<Message>>,
 }
 
 impl Http {
-    pub fn new() -> Self {
-        Self { app: Router::new() }
+    pub fn new(channels: HashMap<String, Sender<Message>>) -> Self {
+        Self { app: Router::new(), channels }
     }
     pub fn add_matrix_route(&mut self, hs_token: &str) {
+        let shared = Arc::new(AppState { channels: self.channels.clone() });
         self.app = self
             .app
             .clone()
             .route("/", get(handle_root_get).fallback(unsupported_method))
             .route("/_matrix/", get(|| async {}).fallback(unsupported_method))// TODO: request method
             .route("/_matrix/app/v1/users/:userId", get(get_user).fallback(unsupported_method))
-            .route("/_matrix/app/v1/transactions/:txnId", put(put_transaction).fallback(unsupported_method))
+            .route("/_matrix/app/v1/transactions/:txnId", put(put_transaction).layer(Extension(shared.clone())).fallback(unsupported_method))
             .route("/_matrix/app/v1/rooms/:room", get(get_room).fallback(unsupported_method))
             .route("/_matrix/app/v1/thirdparty/protocol/:protocol", get(get_thirdparty_protocol).fallback(unsupported_method))
             .route("/_matrix/app/v1/ping", post(post_ping).fallback(unsupported_method))
@@ -120,13 +136,13 @@ impl Http {
             .route("/_matrix/app/v1/thirdparty/user", get(get_thirdparty_user).fallback(unsupported_method))
             .route("/_matrix/app/v1/thirdparty/user/:protocol", get(get_thirdparty_user_protocol).fallback(unsupported_method))
             .fallback(unknown_route)
+            .layer(Extension(shared))
             .route_layer(ValidateRequestHeaderLayer::custom(MatrixBearer::new(
                 hs_token,
             )));
     }
-    // pub async fn serve(&self, listener: TcpListener) {
-    //     axum::serve(listener, self.app).await.unwrap();
-    // }
+
+
 }
 
 async fn handle_root_get() -> Response {
@@ -348,7 +364,7 @@ async fn into_bytes_request(request: Request<Body>) -> axum::http::Request<Bytes
     request
 }
 
-async fn handle_put_transaction(request: RumaPushEventRequest) {
+async fn handle_put_transaction(request: RumaPushEventRequest, state: Arc<AppState>) {
 
     #[derive(Debug, Deserialize)]
     struct MaybeStateEvent {
@@ -365,6 +381,10 @@ async fn handle_put_transaction(request: RumaPushEventRequest) {
         age: i64,
         content: ruma::events::room::member::RoomMemberEventContent,
     }
+
+    dbg!("channels: {:#?}", &state.channels);
+    let irc_channel = state.channels.get("IRC").expect("Error grabbing IRC channel");
+
     for event in request.events.iter() {
         dbg!("event! {:#?}", event);
 
@@ -382,14 +402,30 @@ async fn handle_put_transaction(request: RumaPushEventRequest) {
 
         let maybe_text_event  = serde_json::from_value::<ruma::events::room::message::TextMessageEventContent>(undecided_event.content);
 
+        //if let Some(sender) =
         match maybe_text_event {
             Ok(text) => {
                 dbg!("got event text {:?}", text.body);
+                // send Message to other buses
+                let _ = irc_channel.send(Message::Text {
+                    sender: 2,
+                    pipo_id: 12345678,
+                    transport: "IRC".to_string(),
+                    username: "pipo".to_string(),
+                    avatar_url: None,
+                    message: Some("hello world".to_string()),
+                    is_edit: false,
+                    attachments: None,
+                    irc_flag: true,
+                    thread: None,
+                });
+
             },
             Err(e) => {
                 dbg!("some error getting text event {:#?}", e);
             }
         }
+
 
 
 
@@ -411,7 +447,8 @@ async fn handle_put_transaction(request: RumaPushEventRequest) {
 
     }
 }
-async fn put_transaction(Path(tid): Path<String>, request: RequestExtractor) -> Response {
+
+async fn put_transaction(Extension(state): Extension<Arc<AppState>>, Path(tid): Path<String>, request: RequestExtractor) -> Response {
 
     dbg!("puttxn");
     dbg!("payload: {:#?}", &request);
@@ -424,7 +461,7 @@ async fn put_transaction(Path(tid): Path<String>, request: RequestExtractor) -> 
 
     if MATRIX_HANDLERS_RELEASED {
         // do whatever it takes.
-        handle_put_transaction(req).await;
+        handle_put_transaction(req, state).await;
     };
 
     let response = Response::builder()
@@ -495,7 +532,7 @@ mod tests {
     const TEST_TOKEN: &'static str = "unit-test";
 
     async fn test_response(hs_token: &str, request: Request<Body>, expected: Response) {
-        let mut http = Http::new();
+        let mut http = Http::new(HashMap::new());
         http.add_matrix_route(hs_token);
         // TODO(nemo): Decide if using tower_service::oneshot() is better
         // than call().

@@ -88,7 +88,7 @@ impl IRC {
 		..Config::default()
 	    }
 	};
-	
+
 	Ok(IRC {
 	    config,
 	    img_root: img_root.to_string(),
@@ -271,7 +271,7 @@ impl IRC {
 
 		let message = if is_edit {
 		    is_edit = false;
-		    
+
 		    format!("\x01ACTION \x02* \x02{}!\x02{}\x02 {}*\x01",
 			    &transport[..1].to_uppercase(), username, msg)
 		}
@@ -279,7 +279,7 @@ impl IRC {
 		    format!("\x01ACTION \x02* \x02{}!\x02{}\x02 {}\x01",
 			    &transport[..1].to_uppercase(), username, msg)
 		};
-		
+
 		if let Err(e) = client.send_privmsg(channel.clone(),
 					  message.clone()) {
 		    eprintln!("Failed to send message '{}' channel {}: {:#}",
@@ -298,7 +298,7 @@ impl IRC {
 			   attachments: Option<Vec<Attachment>>,
 			   is_edit: bool) {
 	if !is_edit { return }
-	
+
 	if let Some(attachment) = attachments {
 	    IRC::handle_attachments(client, channel, attachment);
 	}
@@ -338,13 +338,13 @@ impl IRC {
 	if irc_flag && is_edit { message = None }
 	if let Some(message) = message {
 	    let mut is_edit = is_edit;
-	
+
 	    for msg in message.split("\n") {
 		if msg == "" { continue }
-		
+
 		let message = if is_edit {
 		    is_edit = false;
-		    
+
 		    format!("\x01ACTION <{}!\x02{}\x02> \x02EDIT:\x02 {}\x01",
 			    &transport[..1].to_uppercase(), username, msg)
 		}
@@ -352,7 +352,7 @@ impl IRC {
 		    format!("\x01ACTION <{}!\x02{}\x02> {}\x01",
 			    &transport[..1].to_uppercase(), username, msg)
 		};
-		
+
 		if let Err(e) = client.send_privmsg(channel.clone(),
 						    message.clone()) {
 		    eprintln!("Failed to send message '{}' channel {}: {:#}",
@@ -360,7 +360,7 @@ impl IRC {
 		}
 	    }
 	}
-	
+
 	if let Some(attachment) = attachments {
 	    IRC::handle_attachments(client, channel, attachment);
 	}
@@ -386,16 +386,16 @@ impl IRC {
 		    None => continue
 		}
 	    };
-	    
+
 	    if !has_text && !has_fallback { continue }
 
 	    let mut line_counter = 0;
-	    
+
 	    for msg in text.split("\n") {
 		line_counter += 1;
 
 		if msg == "" { continue }
-		
+
 		let message = if author_name.is_empty() {
 		    format!("\x01ACTION [\x02{}\x02] {}\x01", service_name,
 			    msg)
@@ -429,7 +429,7 @@ impl IRC {
 	    let irc_stream = client.stream()?;
 	    let mut input_buses = StreamMap::new();
 	    for (channel_name, channel) in self.channels.iter() {
-		input_buses.insert(channel_name.clone(), 
+		input_buses.insert(channel_name.clone(),
 				   BroadcastStream::new(channel.subscribe()));
 		if let Err(e) = client.send_join(channel_name) {
 		    eprintln!("Failed to join channel {}: {:#}", channel_name,
@@ -472,7 +472,7 @@ impl IRC {
 	    let avatar_url = self.get_avatar_url(&nickname).await;
 
 	    eprintln!("IRC PIPO ID: {}", pipo_id);
-	    
+
 	    if let Some(message) = RE.captures(&message) {
 		let message = message.get(1).unwrap().as_str();
 		let message = Message::Action {
@@ -512,6 +512,7 @@ impl IRC {
 	    }
 	}
 	else {
+        dbg!("Failed getting sender for channel {:#?}", &channel);
 	    return Err(anyhow!("Could not get sender for channel {}", channel))
 	}
     }
@@ -522,11 +523,11 @@ impl IRC {
 
 	// TODO: ugly error handling needs fixing
 	match conn.interact(move |conn| -> anyhow::Result<usize> {
-		Ok(conn.execute("INSERT OR REPLACE INTO messages (id) 
+		Ok(conn.execute("INSERT OR REPLACE INTO messages (id)
                                  VALUES (?1)", params![pipo_id])?)
 	}).await {
 		Ok(res) => res,
-		Err(_) => Err(anyhow!("Interact Error"))	
+		Err(_) => Err(anyhow!("Interact Error"))
 	}?;
 
 	let ret = pipo_id;
@@ -546,8 +547,8 @@ impl IRC {
 		static ref RE: Regex
 		    =  Regex::new("^\x01ACTION (.*)\x01\r?$").unwrap();
 	    }
-	    let pipo_id = self.insert_into_messages_table().await?;	    
-	    
+	    let pipo_id = self.insert_into_messages_table().await?;
+
 	    let avatar_url = self.get_avatar_url(&nickname).await;
 
 	    if let Some(message) = RE.captures(&message) {
@@ -591,8 +592,8 @@ impl IRC {
 	    }
 	}
 	else {
+        dbg!("Failed getting sender for channel {:#?}", &channel);
 	    return Err(anyhow!("Could not get sender for channel {}", channel))
 	}
     }
 }
-

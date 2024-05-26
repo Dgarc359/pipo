@@ -147,7 +147,7 @@ impl Matrix {
 
     async fn connect_matrix(&self) -> anyhow::Result<()> {
         println!("matrix -- creating routers and listeners");
-        let mut http_router = Http::new();
+        let mut http_router = Http::new(self.channels.clone());
         http_router.add_matrix_route(&self.registration.hs_token);
         let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", self.listen_port)).await.unwrap();
         println!("matrix -- created routers and listeners, serving");

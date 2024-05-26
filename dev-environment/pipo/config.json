@@ -12,7 +12,7 @@
             "transport":"IRC",
             "nickname":"pipo",
             "server":"ircd",
-            "use_tls":true,
+            "use_tls":false,
             "img_root":"http:\/\/example.com\/pipo",
             "channel_mapping":
             {
@@ -28,7 +28,7 @@
             "channel_mapping":
             {
                 "!room-id-1:example.com":"general",
-                "!.*:synapse":"general",
+                "!.*:synapse":"general"
             }
         }
     ]
