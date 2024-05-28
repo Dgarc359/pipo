@@ -1,3 +1,4 @@
+use regex::{Regex, escape};
 use core::fmt;
 use std::{
     marker::PhantomData,
@@ -374,6 +375,7 @@ async fn handle_put_transaction(request: RumaPushEventRequest, state: Arc<AppSta
     #[derive(Debug, Deserialize)]
     struct UndecidedNonStateEvent {
         pub content: serde_json::Value,
+        pub room_id: String,
     }
 
     #[derive(Debug, Deserialize)]
@@ -383,7 +385,7 @@ async fn handle_put_transaction(request: RumaPushEventRequest, state: Arc<AppSta
     }
 
     dbg!("channels: {:#?}", &state.channels);
-    let irc_channel = state.channels.get("IRC").expect("Error grabbing IRC channel");
+    //let irc_channel = state.channels.get("IRC").expect("Error grabbing IRC channel");
 
     for event in request.events.iter() {
         dbg!("event! {:#?}", event);
@@ -405,8 +407,9 @@ async fn handle_put_transaction(request: RumaPushEventRequest, state: Arc<AppSta
         //if let Some(sender) =
         match maybe_text_event {
             Ok(text) => {
-                dbg!("got event text {:?}", text.body);
+                dbg!("got event text {:?}", &text.body);
                 // send Message to other buses
+                /*
                 let _ = irc_channel.send(Message::Text {
                     sender: 2,
                     pipo_id: 12345678,
@@ -419,6 +422,39 @@ async fn handle_put_transaction(request: RumaPushEventRequest, state: Arc<AppSta
                     irc_flag: true,
                     thread: None,
                 });
+                */
+                for (channel_regex, channel) in &state.channels {
+                    let re = Regex::new(&channel_regex).unwrap();
+                    if re.is_match(&undecided_event.room_id) {
+                        println!("sending message");
+                        let res = channel.send(Message::Text {
+                            sender: 2349124,
+                            pipo_id: 12345,
+                            transport: "IRC".to_string(),
+                            username: "fake username".to_string(),
+                            avatar_url: None,
+                            thread: None,
+                            message: Some(text.body.clone()),
+                            attachments: None,
+                            is_edit: false,
+                            irc_flag: true,
+                        });
+
+                        match res {
+                            Ok(r) => {
+                                println!("successfully sent, response {:#?}", r);
+                            },
+                            Err(e) => {
+                                eprintln!("issue sending to channels, {:#?}", e);
+                            },
+                        }
+                    } else {
+                        println!("match not found");
+                    }
+                    // get room id and match room id to regex
+                    // send text to appropriate channel
+
+                }
 
             },
             Err(e) => {

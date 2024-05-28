@@ -11,7 +11,7 @@ RUN --mount=type=cache,target=$HOME/.cargo/bin,sharing=locked \
     --mount=type=cache,target=$HOME/.cargo/git/db,sharing=locked \
     --mount=type=cache,target=/usr/src/pipo/target,sharing=locked \
     cargo install --debug --path .
-    
+
 FROM builder AS release
 RUN --mount=type=cache,target=$HOME/.cargo/bin,sharing=locked \
     --mount=type=cache,target=$HOME/.cargo/registry/index,sharing=locked \
@@ -23,7 +23,7 @@ CMD ["pipo"]
 
 FROM rust:1.76-slim-bookworm
 RUN apt-get update \
-    && apt-get install -y libsqlite3-0 \
+    && apt-get install -y libsqlite3-0 lldb gdb \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=release /usr/local/cargo/bin/pipo /usr/local/bin/pipo
 CMD ["pipo"]

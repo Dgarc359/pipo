@@ -370,27 +370,10 @@ pub async fn inner_main() -> anyhow::Result<()> {
         bus_map.insert(bus.id, broadcast::channel(100).0);
     }
 
-    // Create Sender and Receiver for database mpsc channel
-    // let (db_tx, mut db_rx): (mpsc::Sender<(String, String)>,
-    // 			     mpsc::Receiver<(String, String)>)
-    // 	= mpsc::channel(100);
-
     // Now do transports and create a ???
     // for each.
 
     let mut all_transport_tasks = vec![];
-    // let handle = tokio::spawn(async move {
-    // 	while let Some((command, message)) = db_rx.recv().await {
-    // 	    match command.as_str() {
-    // 		"execute" => if let Err(e) = db.execute(&message, []) {
-    // 		    eprintln!("Error executing db command: {}", e);
-    // 		},
-    // 		default => eprintln!("{} not implemented.", default)
-    // 	    }
-    // 	}
-    // });
-
-    // all_transport_tasks.push(handle);
 
     for transport_id in 0..config_json.transports.len() {
         match &config_json.transports[transport_id] {
@@ -492,7 +475,7 @@ pub async fn inner_main() -> anyhow::Result<()> {
             ConfigTransport::Matrix {
                 registration_path,
                 channel_mapping,
-                listen_port
+                listen_port,
             } => {
                 let mut instance = Matrix::new(
                     transport_id,

@@ -45,6 +45,10 @@ tower-http = { version = "0.5", features = ["auth", "map-response-body", "valida
 tower-layer = "0.3"
 webpki-roots = "0.26"
 
+[profile.release]
+debug = true
+lto = true
+
 [dev-dependencies]
 tower-service = "0.3.2"
 

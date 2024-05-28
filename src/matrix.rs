@@ -47,7 +47,7 @@ impl Matrix {
                 if let Some(sender) = bus_map.get(bus_name) {
                     Some((channel_name.to_owned(), sender.clone()))
                 } else {
-                    eprintln!("No bus named '{}' in configuration file.", bus_name);
+                    eprintln!("No bus named '{}' in configuration file for channel name: '{}'", bus_name, channel_name);
                     None
                 }
             })
@@ -141,7 +141,7 @@ impl Matrix {
             channels,
             pipo_id,
             pool,
-            listen_port
+            listen_port,
         })
     }
 
