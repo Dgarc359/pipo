@@ -110,6 +110,7 @@ impl IRC {
 		Some((channel, message))
 		    = tokio_stream::StreamExt::next(&mut input_buses) => {
 			let message = message.unwrap();
+            dbg!(&message);
 			match message {
 			    Message::Action {
 				sender,
@@ -202,6 +203,7 @@ impl IRC {
 				is_edit,
 				irc_flag,
 			    } => {
+                    dbg!(&self.transport_id);
 				if sender != self.transport_id {
 				    self.handle_text_message(&client,
 							     &channel,
@@ -353,6 +355,8 @@ impl IRC {
 			    &transport[..1].to_uppercase(), username, msg)
 		};
 
+        dbg!(&message);
+
 		if let Err(e) = client.send_privmsg(channel.clone(),
 						    message.clone()) {
 		    eprintln!("Failed to send message '{}' channel {}: {:#}",
@@ -423,10 +427,10 @@ impl IRC {
 			   StreamMap<String,BroadcastStream<Message>>)> {
 	    let mut client = Client::from_config(self.config.clone()).await?;
 
-	    client.send_cap_req(&[Capability::MultiPrefix])?;
-	    client.identify()?;
+	    client.send_cap_req(&[Capability::MultiPrefix]).expect("there was an issue with the capabilities request");
+	    client.identify().expect("failure to identify with client");
 
-	    let irc_stream = client.stream()?;
+	    let irc_stream = client.stream().expect("failed to get message stream");
 	    let mut input_buses = StreamMap::new();
 	    for (channel_name, channel) in self.channels.iter() {
 		input_buses.insert(channel_name.clone(),

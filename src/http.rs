@@ -107,7 +107,7 @@ impl<B> ValidateRequest<B> for MatrixBearer {
 }
 
 struct AppState {
-    pub channels: HashMap<String, Sender<Message>>
+    pub bus: HashMap<String, Sender<Message>>
 }
 
 pub struct Http {
@@ -121,7 +121,7 @@ impl Http {
         Self { app: Router::new(), channels }
     }
     pub fn add_matrix_route(&mut self, hs_token: &str) {
-        let shared = Arc::new(AppState { channels: self.channels.clone() });
+        let shared = Arc::new(AppState { bus: self.channels.clone() });
         self.app = self
             .app
             .clone()
@@ -376,6 +376,7 @@ async fn handle_put_transaction(request: RumaPushEventRequest, state: Arc<AppSta
     struct UndecidedNonStateEvent {
         pub content: serde_json::Value,
         pub room_id: String,
+        pub sender: String,
     }
 
     #[derive(Debug, Deserialize)]
@@ -384,8 +385,7 @@ async fn handle_put_transaction(request: RumaPushEventRequest, state: Arc<AppSta
         content: ruma::events::room::member::RoomMemberEventContent,
     }
 
-    dbg!("channels: {:#?}", &state.channels);
-    //let irc_channel = state.channels.get("IRC").expect("Error grabbing IRC channel");
+    dbg!("bus: {:#?}", &state.bus);
 
     for event in request.events.iter() {
         dbg!("event! {:#?}", event);
@@ -423,15 +423,15 @@ async fn handle_put_transaction(request: RumaPushEventRequest, state: Arc<AppSta
                     thread: None,
                 });
                 */
-                for (channel_regex, channel) in &state.channels {
+                for (channel_regex, channel) in &state.bus {
                     let re = Regex::new(&channel_regex).unwrap();
                     if re.is_match(&undecided_event.room_id) {
                         println!("sending message");
                         let res = channel.send(Message::Text {
-                            sender: 2349124,
+                            sender: 1223,
                             pipo_id: 12345,
                             transport: "IRC".to_string(),
-                            username: "fake username".to_string(),
+                            username: undecided_event.sender.clone(),
                             avatar_url: None,
                             thread: None,
                             message: Some(text.body.clone()),

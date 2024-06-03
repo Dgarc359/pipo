@@ -11,7 +11,7 @@
         {
             "transport":"IRC",
             "nickname":"pipo",
-            "server":"ircd",
+            "server":"irc",
             "use_tls":false,
             "img_root":"http:\/\/example.com\/pipo",
             "channel_mapping":

@@ -1,14 +1,26 @@
 services:
-  ircd:
-    build:
-      context: ./dev-environment/unrealircd
-    restart: unless-stopped
-    configs:
-      - source: unrealircd
-        target: /ircd/unrealircd.conf
+  irc:
+    image: lscr.io/linuxserver/ngircd:latest
+    container_name: irc
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/utc
+    volumes:
+      - ./dev-environment/irc:/config
     ports:
       - "${IRCD_LISTEN_ADDR:-127.0.0.1}:${IRCD_PORT:-6667}:6667"
       - "${IRCD_LISTEN_ADDR:-127.0.0.1}:${IRCD_TLS_PORT:-6697}:6697"
+    restart: unless-stopped
+      #build:
+      #context: ./dev-environment/unrealircd
+      #    restart: unless-stopped
+      #    configs:
+      #      - source: unrealircd
+      #        target: /ircd/unrealircd.conf
+      #    ports:
+      #      - "${IRCD_LISTEN_ADDR:-127.0.0.1}:${IRCD_PORT:-6667}:6667"
+      #      - "${IRCD_LISTEN_ADDR:-127.0.0.1}:${IRCD_TLS_PORT:-6697}:6697"
     healthcheck:
       test: ["CMD", "netstat", "-an", "|", "grep", "6697", "/dev/null;", "if", "[", "0", "!=", "$?", "];", "then", "exit", "1;", "fi;"]
       interval: 1s
@@ -52,9 +64,9 @@ services:
 
   app:
     links:
-      - ircd
+      - irc
     depends_on:
-      ircd:
+      irc:
         condition: service_healthy
     build:
       context: .
@@ -80,6 +92,8 @@ configs:
     file: ./dev-environment/synapse/homeserver.yaml
   unrealircd:
     file: ./dev-environment/unrealircd/unrealircd.conf
+  irc:
+    file: ./dev-environment/irc/irc.conf
   synapse-log-config:
     file: ./dev-environment/synapse/synapse.log.config
 
