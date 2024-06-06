@@ -8,6 +8,7 @@ use std::{
 
 use axum::{Router, routing::get};
 
+use tokio_stream::{StreamMap, wrappers::BroadcastStream};
 use anyhow::anyhow;
 use deadpool_sqlite::Pool;
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
@@ -62,10 +63,12 @@ impl Matrix {
             .map(|x| Namespace::new(true, format!("@_{}_.*:tejat\\.net", x.to_lowercase())))
             .collect();
             */
+        /*
         namespaces.users = protocols
             .iter()
             .map(|x| Namespace::new(true, "@.*:synapse".to_string()))
             .collect();
+            */
 
         namespaces.aliases = protocols
             .iter()
@@ -145,7 +148,7 @@ impl Matrix {
         })
     }
 
-    async fn connect_matrix(&self) -> anyhow::Result<()> {
+    async fn serve_axum(&self) -> anyhow::Result<()> {
         println!("matrix -- creating routers and listeners");
         let mut http_router = Http::new(self.channels.clone());
         http_router.add_matrix_route(&self.registration.hs_token);
@@ -154,9 +157,41 @@ impl Matrix {
         Ok(axum::serve(listener, http_router.app).await.unwrap())
     }
 
+    fn create_input_buses(&self) -> StreamMap<String,BroadcastStream<Message>> {
+        let mut input_buses = StreamMap::new();
+
+        for (channel_name, channel) in self.channels.iter() {
+            input_buses.insert(channel_name.clone(),
+                BroadcastStream::new(channel.subscribe()));
+        }
+
+        input_buses
+    }
+
+    async fn connect_matrix(&self) -> anyhow::Result<
+            StreamMap<String,BroadcastStream<Message>>
+        > {
+        self.serve_axum().await?;
+        let input_buses = self.create_input_buses();
+
+        Ok(input_buses)
+    }
+
     pub async fn connect(&self) -> anyhow::Result<()> {
         println!("matrix -- connecting");
-        Ok(self.connect_matrix().await?)
+        let mut input_buses = self.connect_matrix().await?;
+
+        loop {
+            // stupid sexy infinite loop?
+            tokio::select! {
+                Some ((channel, message))
+                    = tokio_stream::StreamExt::next(&mut input_buses) => {
+                        let message = message.unwrap();
+                        dbg!(&message);
+                        return Ok(());
+                    }
+            }
+        }
     }
 }
 

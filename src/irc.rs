@@ -106,6 +106,7 @@ impl IRC {
 
 	loop {
 	    // stupid sexy infinite loop
+        // dvd: what is the use for select here?
 	    tokio::select! {
 		Some((channel, message))
 		    = tokio_stream::StreamExt::next(&mut input_buses) => {
@@ -466,6 +467,7 @@ impl IRC {
 			     nickname: String,
 			     channel: String,
 			     message: String) -> anyhow::Result<()> {
+    dbg!("handling private message");
 	if let Some(sender) = self.channels.get(&channel) {
 	    lazy_static! {
 		static ref RE: Regex
@@ -497,6 +499,7 @@ impl IRC {
 		}
 	    }
 	    else {
+            // handling private message
 		let message = Message::Text {
 		    sender: self.transport_id,
 		    pipo_id,
@@ -576,6 +579,7 @@ impl IRC {
 		}
 	    }
 	    else {
+            // handle message notice?
 		let message = Message::Text {
 		    sender: self.transport_id,
 		    pipo_id,
