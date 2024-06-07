@@ -148,7 +148,7 @@ impl Matrix {
         })
     }
 
-    async fn serve_axum(&self) -> anyhow::Result<()> {
+    pub async fn serve_axum(&self) -> anyhow::Result<()> {
         println!("matrix -- creating routers and listeners");
         let mut http_router = Http::new(self.channels.clone());
         http_router.add_matrix_route(&self.registration.hs_token);
@@ -158,9 +158,11 @@ impl Matrix {
     }
 
     fn create_input_buses(&self) -> StreamMap<String,BroadcastStream<Message>> {
+        dbg!("creating input buses");
         let mut input_buses = StreamMap::new();
 
         for (channel_name, channel) in self.channels.iter() {
+            dbg!(&channel_name, &channel);
             input_buses.insert(channel_name.clone(),
                 BroadcastStream::new(channel.subscribe()));
         }
@@ -171,7 +173,7 @@ impl Matrix {
     async fn connect_matrix(&self) -> anyhow::Result<
             StreamMap<String,BroadcastStream<Message>>
         > {
-        self.serve_axum().await?;
+        //self.serve_axum().await?;
         let input_buses = self.create_input_buses();
 
         Ok(input_buses)
@@ -188,10 +190,11 @@ impl Matrix {
                     = tokio_stream::StreamExt::next(&mut input_buses) => {
                         let message = message.unwrap();
                         dbg!(&message);
-                        return Ok(());
                     }
+
             }
         }
+
     }
 }
 

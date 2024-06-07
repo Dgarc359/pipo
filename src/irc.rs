@@ -493,6 +493,7 @@ impl IRC {
 		    is_edit: false,
 		    irc_flag: false,
 		};
+        dbg!("sending message", &message);
 		return match sender.send(message) {
 		    Ok(_) => Ok(()),
 		    Err(e) => Err(anyhow!("Couldn't send message: {:#}", e))

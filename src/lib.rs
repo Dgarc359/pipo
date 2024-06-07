@@ -489,8 +489,10 @@ pub async fn inner_main() -> anyhow::Result<()> {
                     listen_port.to_string(),
                 )
                 .await?;
+                let t = Arc::new(instance);
+                let t_clone = t.clone();
                 let handle = tokio::spawn(async move {
-                    match instance.connect().await {
+                    match t.connect().await {
                         Ok(_) => eprintln!("Matrix::connect() exited Ok"),
                         Err(e) => {
                             eprintln!(
@@ -501,7 +503,16 @@ pub async fn inner_main() -> anyhow::Result<()> {
                         }
                     }
                 });
+
+                let handle_axum = tokio::spawn(async move {
+                    match t_clone.serve_axum().await {
+                        Ok(_) => eprintln!("Matrix serving axum routes"),
+                        Err(_) => eprintln!("Matrix issue serving axum routes"),
+                    }
+                });
+
                 all_transport_tasks.push(handle);
+                all_transport_tasks.push(handle_axum);
             }
             ConfigTransport::Minecraft {
                 username: _,
