@@ -15,6 +15,7 @@ use rand::{rngs::ThreadRng, thread_rng, RngCore};
 use ruma::api::appservice::{Namespace, Namespaces, Registration, RegistrationInit};
 use tokio::sync::broadcast;
 
+
 use crate::http::Http;
 use crate::{ConfigTransport, Message};
 
@@ -170,6 +171,7 @@ impl Matrix {
         input_buses
     }
 
+    // TODO: refactor this to return axum as well?
     async fn connect_matrix(&self) -> anyhow::Result<
             StreamMap<String,BroadcastStream<Message>>
         > {
@@ -177,6 +179,29 @@ impl Matrix {
         let input_buses = self.create_input_buses();
 
         Ok(input_buses)
+    }
+
+    async fn handle_text_msg(&self, msg: String) -> anyhow::Result<()> {
+        // make a request to synapse backend service
+        // https://spec.matrix.org/v1.10/client-server-api/#mroommessage
+
+        dbg!("handling message", &msg);
+        // https://spec.matrix.org/v1.10/client-server-api/#put_matrixclientv3roomsroomidstateeventtypestatekey
+
+        let req_client = reqwest::Client::builder()
+            .build()
+            .unwrap();
+
+        // request matrix rooms from homeserver / local cache
+        // gather all rooms that apply to regex
+        // send message to all those rooms
+        let response = req_client.get("https://localhost:8008/_synapse/admin/v1/rooms")
+            .header("Authorization", format!("Bearer: {}", self.registration.as_token))
+            .send()
+            .await?;
+        dbg!(response);
+
+        Ok(())
     }
 
     pub async fn connect(&self) -> anyhow::Result<()> {
@@ -190,6 +215,20 @@ impl Matrix {
                     = tokio_stream::StreamExt::next(&mut input_buses) => {
                         let message = message.unwrap();
                         dbg!(&message);
+                        match message {
+                            Message::Text {
+                                message,
+                                ..
+                            } => {
+                                let message = message.unwrap();
+                                match self.handle_text_msg(message).await {
+                                    Ok(_) => eprintln!("Matrix -- Successfully handled message"),
+                                    Err(e) => eprintln!("Matrix -- Error handling handling message\
+                                                        {:#?}",e)
+                                }
+                            }
+                            _ => continue
+                        }
                     }
 
             }
