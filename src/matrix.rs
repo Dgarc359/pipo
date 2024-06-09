@@ -6,15 +6,15 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use axum::{Router, routing::get};
+use axum::{routing::get, Router};
 
-use tokio_stream::{StreamMap, wrappers::BroadcastStream};
 use anyhow::anyhow;
 use deadpool_sqlite::Pool;
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 use ruma::api::appservice::{Namespace, Namespaces, Registration, RegistrationInit};
+use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
-
+use tokio_stream::{wrappers::BroadcastStream, StreamMap};
 
 use crate::http::Http;
 use crate::{ConfigTransport, Message};
@@ -49,7 +49,10 @@ impl Matrix {
                 if let Some(sender) = bus_map.get(bus_name) {
                     Some((channel_name.to_owned(), sender.clone()))
                 } else {
-                    eprintln!("No bus named '{}' in configuration file for channel name: '{}'", bus_name, channel_name);
+                    eprintln!(
+                        "No bus named '{}' in configuration file for channel name: '{}'",
+                        bus_name, channel_name
+                    );
                     None
                 }
             })
@@ -64,17 +67,15 @@ impl Matrix {
             .map(|x| Namespace::new(true, format!("@_{}_.*:tejat\\.net", x.to_lowercase())))
             .collect();
             */
-        /*
         namespaces.users = protocols
             .iter()
             .map(|x| Namespace::new(true, "@.*:synapse".to_string()))
             .collect();
-            */
 
         namespaces.aliases = protocols
             .iter()
             //.map(|x| Namespace::new(true, format!("#_{}_.#:tejat\\.net", x.to_lowercase())))
-            .map(|x| Namespace::new(false, "t.*".to_string()))
+            .map(|x| Namespace::new(false, ".*".to_string()))
             .collect();
         /*
         namespaces.aliases = protocols
@@ -104,7 +105,7 @@ impl Matrix {
                         registration.id
                     ))
                 }
-            },
+            }
             Err(e) => match e.kind() {
                 std::io::ErrorKind::NotFound => {
                     println!("matrix -- did not find registration file, pulling fields");
@@ -125,7 +126,7 @@ impl Matrix {
                     let registration_file = File::create(&registration_path)?;
                     serde_yaml::to_writer(registration_file, &registration)?;
                     Ok(registration)
-                },
+                }
                 _ => Err(e.into()),
             },
         }?;
@@ -134,7 +135,11 @@ impl Matrix {
         // and then when I can figure out how to do this right, this can be
         // removed
 
-        let fd = File::options().truncate(true).write(true).open(&registration_path).unwrap();
+        let fd = File::options()
+            .truncate(true)
+            .write(true)
+            .open(&registration_path)
+            .unwrap();
         serde_yaml::to_writer(fd, &registration)?;
 
         dbg!("late registration {:#?}", &registration);
@@ -153,28 +158,30 @@ impl Matrix {
         println!("matrix -- creating routers and listeners");
         let mut http_router = Http::new(self.channels.clone());
         http_router.add_matrix_route(&self.registration.hs_token);
-        let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", self.listen_port)).await.unwrap();
+        let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", self.listen_port))
+            .await
+            .unwrap();
         println!("matrix -- created routers and listeners, serving");
         Ok(axum::serve(listener, http_router.app).await.unwrap())
     }
 
-    fn create_input_buses(&self) -> StreamMap<String,BroadcastStream<Message>> {
+    fn create_input_buses(&self) -> StreamMap<String, BroadcastStream<Message>> {
         dbg!("creating input buses");
         let mut input_buses = StreamMap::new();
 
         for (channel_name, channel) in self.channels.iter() {
             dbg!(&channel_name, &channel);
-            input_buses.insert(channel_name.clone(),
-                BroadcastStream::new(channel.subscribe()));
+            input_buses.insert(
+                channel_name.clone(),
+                BroadcastStream::new(channel.subscribe()),
+            );
         }
 
         input_buses
     }
 
     // TODO: refactor this to return axum as well?
-    async fn connect_matrix(&self) -> anyhow::Result<
-            StreamMap<String,BroadcastStream<Message>>
-        > {
+    async fn connect_matrix(&self) -> anyhow::Result<StreamMap<String, BroadcastStream<Message>>> {
         //self.serve_axum().await?;
         let input_buses = self.create_input_buses();
 
@@ -188,18 +195,79 @@ impl Matrix {
         dbg!("handling message", &msg);
         // https://spec.matrix.org/v1.10/client-server-api/#put_matrixclientv3roomsroomidstateeventtypestatekey
 
-        let req_client = reqwest::Client::builder()
-            .build()
-            .unwrap();
+        let req_client = reqwest::Client::builder().build().unwrap();
+
+        // matrix message content isn't nested inside of 'content' when
+        // sending to client-server API
+        // as opposed to when app-service sees events
+        // https://github.com/matrix-org/synapse/issues/1889
+        // notice that when destructuring events in handle put txn
+        // we have to pull body from content
+        #[derive(Debug, Serialize, Deserialize)]
+        struct MatrixMsg {
+            //#[serde(rename = "type")]
+            //pub kind: String,
+            pub body: String,
+            pub formatted: Option<serde_json::Value>,
+            pub msgtype: String,
+            //pub room_id: String,
+            //pub sender: String,
+        }
+
+        // TODO: remove once other things are working better
+        // This request just verifies requests to synapse backend are working
+        // check log outputs for validation
+        dbg!("grabbing matrix home server -- smoke test request");
+        let request = req_client
+            .get("http://172.17.0.1:8001")
+            .header("Accept", "*/*")
+            .header("User-Agent", "pipo-matrix");
+        dbg!("finished grabbing matrix home server", &request);
+
+        let response = request.send().await?;
+        dbg!(response);
+
+        let request_body = serde_json::json!(MatrixMsg {
+            //kind: "m.room.message".to_string(),
+            body: msg,
+            formatted: None,
+            msgtype: "m.text".to_string(),
+            // TODO: remove hardcoded values
+            //room_id: "!asmEFDdTjhQtlYCYHJ:synapse".to_string(),
+            //sender: "dvd".to_string(),
+        });
+        dbg!(&request_body);
 
         // request matrix rooms from homeserver / local cache
         // gather all rooms that apply to regex
         // send message to all those rooms
-        let response = req_client.get("https://localhost:8008/_synapse/admin/v1/rooms")
-            .header("Authorization", format!("Bearer: {}", self.registration.as_token))
-            .send()
-            .await?;
-        dbg!(response);
+        // local dev config described below
+        // 172.17.0.1 is internal docker addr for linux
+        // https://stackoverflow.com/questions/48546124/what-is-the-linux-equivalent-of-host-docker-internal
+        // NOTE: this will cause issues on non-linux systems
+        // we should pass in this ip as a configuration
+        dbg!("sending event");
+        // TODO: hardcoded username, docker internal ip, and room id
+        // TODO: state key in path where necessary
+        let request = req_client.put("http://172.17.0.1:8001/_matrix/client/v3/rooms/!asmEFDdTjhQtlYCYHJ:synapse/state/m.room.message/test-key?user_id=@dvd:synapse")
+            .header("Accept", "*/*")
+            .header("User-Agent", "pipo-matrix")
+            .header("Authorization", format!("Bearer {}", self.registration.as_token))
+            .json(&request_body);
+
+        dbg!(&request);
+
+        let response = request.send().await?.text().await?;
+
+        dbg!(&response);
+
+        Ok(())
+    }
+
+    /**
+     * connect virtual user to matrix home server room
+     */
+    pub async fn connect_virtual_user(user: String, room_id: String) -> anyhow::Result<()> {
 
         Ok(())
     }
@@ -233,7 +301,6 @@ impl Matrix {
 
             }
         }
-
     }
 }
 
