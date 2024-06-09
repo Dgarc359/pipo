@@ -208,9 +208,9 @@ impl Matrix {
             //#[serde(rename = "type")]
             //pub kind: String,
             pub body: String,
-            //#[serde(rename = "m.mentions")]
-            //pub mentions: Option<serde_json::Value>,
-            pub formatted: Option<ruma::events::room::message::FormattedBody>,
+            #[serde(rename = "m.mentions")]
+            pub mentions: Option<serde_json::Value>,
+            //pub formatted: Option<ruma::events::room::message::FormattedBody>,
             pub msgtype: String,
             //pub msgtype: ruma::events::room::message::MessageType,
             //pub room_id: String,
@@ -245,10 +245,11 @@ impl Matrix {
 
         let body = MatrixMsg {
             body: msg,
-            formatted: None,
+            mentions: Some(serde_json::json!({})),
             msgtype: "m.text".to_string(),
         };
 
+        /*
         let body: ruma::events::AnyMessageLikeEventContent = serde_json::from_value::<
             ruma::events::room::message::RoomMessageEventContent,
         >(serde_json::json!(body)).unwrap().into();
@@ -259,14 +260,16 @@ impl Matrix {
                 ruma::events::MessageLikeEventType::RoomMessage,
                ruma::serde::Raw::new(&body).unwrap()
             );
+            */
 
 
-        let request = req_client.put("http://172.17.0.1:8001/_matrix/client/v3/rooms/!asmEFDdTjhQtlYCYHJ:synapse/state/m.room.message?user_id=@dvd:synapse")
+        let request = req_client.put("http://172.17.0.1:8001/_matrix/client/v3/rooms/!asmEFDdTjhQtlYCYHJ%3Asynapse/send/m.room.message/m1717952450012.6?user_id=@dvd%3Asynapse")
             .header("Accept", "application/json")
             .header("Content-Type", "application/json")
+            .header("Access-Control-Allow-Origin", "*")
             .header("User-Agent", "pipo-matrix")
             .header("Authorization", format!("Bearer {}", self.registration.as_token))
-            .json(&res.body);
+            .json(&body);
 
         dbg!(&request);
 
