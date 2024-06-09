@@ -203,13 +203,16 @@ impl Matrix {
         // https://github.com/matrix-org/synapse/issues/1889
         // notice that when destructuring events in handle put txn
         // we have to pull body from content
-        #[derive(Debug, Serialize, Deserialize)]
+        #[derive(Serialize,Deserialize)]
         struct MatrixMsg {
             //#[serde(rename = "type")]
             //pub kind: String,
             pub body: String,
-            pub formatted: Option<serde_json::Value>,
+            //#[serde(rename = "m.mentions")]
+            //pub mentions: Option<serde_json::Value>,
+            pub formatted: Option<ruma::events::room::message::FormattedBody>,
             pub msgtype: String,
+            //pub msgtype: ruma::events::room::message::MessageType,
             //pub room_id: String,
             //pub sender: String,
         }
@@ -227,17 +230,6 @@ impl Matrix {
         let response = request.send().await?;
         dbg!(response);
 
-        let request_body = serde_json::json!(MatrixMsg {
-            //kind: "m.room.message".to_string(),
-            body: msg,
-            formatted: None,
-            msgtype: "m.text".to_string(),
-            // TODO: remove hardcoded values
-            //room_id: "!asmEFDdTjhQtlYCYHJ:synapse".to_string(),
-            //sender: "dvd".to_string(),
-        });
-        dbg!(&request_body);
-
         // request matrix rooms from homeserver / local cache
         // gather all rooms that apply to regex
         // send message to all those rooms
@@ -249,25 +241,38 @@ impl Matrix {
         dbg!("sending event");
         // TODO: hardcoded username, docker internal ip, and room id
         // TODO: state key in path where necessary
-        let request = req_client.put("http://172.17.0.1:8001/_matrix/client/v3/rooms/!asmEFDdTjhQtlYCYHJ:synapse/state/m.room.message/test-key?user_id=@dvd:synapse")
-            .header("Accept", "*/*")
+        let room_id = ruma::room_id!("!asmEFDdTjhQtlYCYHJ:synapse");
+
+        let body = MatrixMsg {
+            body: msg,
+            formatted: None,
+            msgtype: "m.text".to_string(),
+        };
+
+        let body: ruma::events::AnyMessageLikeEventContent = serde_json::from_value::<
+            ruma::events::room::message::RoomMessageEventContent,
+        >(serde_json::json!(body)).unwrap().into();
+
+        let res = ruma::api::client::message::send_message_event::v3::Request::new_raw(
+                ruma::OwnedRoomId::from(room_id),
+                ruma::OwnedTransactionId::from("69".to_string()),
+                ruma::events::MessageLikeEventType::RoomMessage,
+               ruma::serde::Raw::new(&body).unwrap()
+            );
+
+
+        let request = req_client.put("http://172.17.0.1:8001/_matrix/client/v3/rooms/!asmEFDdTjhQtlYCYHJ:synapse/state/m.room.message?user_id=@dvd:synapse")
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
             .header("User-Agent", "pipo-matrix")
             .header("Authorization", format!("Bearer {}", self.registration.as_token))
-            .json(&request_body);
+            .json(&res.body);
 
         dbg!(&request);
 
         let response = request.send().await?.text().await?;
 
         dbg!(&response);
-
-        Ok(())
-    }
-
-    /**
-     * connect virtual user to matrix home server room
-     */
-    pub async fn connect_virtual_user(user: String, room_id: String) -> anyhow::Result<()> {
 
         Ok(())
     }
